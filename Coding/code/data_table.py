@@ -2,6 +2,9 @@
 import pandas as pd
 import numpy as np
 from urllib.parse import quote
+import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
+from matplotlib.transforms import blended_transform_factory
 
 
 #%%------- IMPORT RAW DATA FROM GITHUB
@@ -261,7 +264,7 @@ data["tusd"] = tusd
 
 #%% FDUSD Market Cap - Independent
 """
-# create daily log changes
+# create daily log changes REMOVED DUE TO LOW DATA AVAILABILITY
 
 fdusd = data_raw["fdusd"].copy()
 
@@ -404,45 +407,67 @@ data["usd_index"] = usd_index
 
 
 #%% NFCI - Confounder
-# weekly level, converted to daily by forward filling
+# weekly level, aligned by approximate publication date and forward-filled
 
 nfci = data_raw["nfci"].copy()
 
-# only date and val
+# only date and value
 nfci = nfci[["Friday_of_Week", "NFCI"]].copy()
 
-# make date column
-nfci["date"] = pd.to_datetime(nfci["Friday_of_Week"], format="%m/%d/%Y").dt.date
+# convert Friday-of-week date
+nfci["week_ending_friday"] = pd.to_datetime(
+    nfci["Friday_of_Week"],
+    format="%m/%d/%Y",
+    errors="coerce"
+)
 
-# NFCI to numeric
+# convert NFCI to numeric
 nfci["NFCI"] = pd.to_numeric(nfci["NFCI"], errors="coerce")
 
-# date sort
-nfci = nfci.sort_values("date").reset_index(drop=True)
+# drop unusable rows
+nfci = nfci.dropna(subset=["week_ending_friday", "NFCI"]).copy()
 
-# set date index for expansion
-nfci["date"] = pd.to_datetime(nfci["date"])
-nfci = nfci.set_index("date")
+# approximate publication date:
+# NFCI is released on Wednesday and covers the previous Friday
+nfci["date"] = nfci["week_ending_friday"] + pd.Timedelta(days=5)
 
-# weekly observations to daily frequency
-nfci = nfci.asfreq("D")
+# keep only relevant columns
+nfci = nfci[["date", "NFCI"]].copy()
 
-# forward fill weekly value to daily observations
+# sort and remove duplicate publication dates if any
+nfci = (
+    nfci
+    .sort_values("date")
+    .drop_duplicates(subset="date", keep="last")
+    .reset_index(drop=True)
+)
+
+# create full daily calendar from first to last NFCI release
+nfci_daily_calendar = pd.DataFrame({
+    "date": pd.date_range(nfci["date"].min(), nfci["date"].max(), freq="D")
+})
+
+# merge weekly releases onto daily calendar
+nfci = pd.merge(
+    nfci_daily_calendar,
+    nfci,
+    on="date",
+    how="left"
+)
+
+# forward-fill from release date onward
 nfci["NFCI"] = nfci["NFCI"].ffill()
 
-# reset index
-nfci = nfci.reset_index()
-
-# convert back to date only
+# convert date back to date-only format
 nfci["date"] = nfci["date"].dt.date
 
-# rename data col
-nfci = nfci.rename(columns={"NFCI": "ncfi_weekly_fill"})
+# rename
+nfci = nfci.rename(columns={"NFCI": "nfci_weekly_fill"})
 
-# keep only final format
-nfci = nfci[["date", "ncfi_weekly_fill"]].copy()
+# keep final format
+nfci = nfci[["date", "nfci_weekly_fill"]].copy()
 
-# clean version
+# store clean version
 data["nfci"] = nfci
 
 
@@ -485,3 +510,231 @@ merged_full = merged_full[
 print(merged_full.head())
 print(merged_full.tail())
 print(merged_full.info())
+
+
+#%%------- DATA AVAILABILITY GRAPH
+
+# use Palatino Linotype
+plt.rcParams["font.family"] = "Palatino Linotype"
+
+# create full daily calendar for sample period
+sample_start = pd.to_datetime("2020-01-01")
+sample_end = pd.to_datetime("2025-12-31")
+
+full_calendar = pd.DataFrame({
+    "date": pd.date_range(sample_start, sample_end, freq="D").date
+})
+
+# merge onto full calendar to make sure every calendar day is counted
+availability_df = pd.merge(
+    full_calendar,
+    merged_full,
+    on="date",
+    how="left"
+)
+
+# total number of calendar days
+total_days = len(availability_df)
+print(f"Total days in sample: {total_days}")
+
+# classify variables
+crypto_vars = [
+    "usdt_mcap_daily_log_chg",
+    "usdc_mcap_daily_log_chg",
+    "dai_mcap_daily_log_chg",
+    "tusd_mcap_daily_log_chg",
+    "tradingVol_btc+eth_daily_log_chg",
+]
+
+tradfi_vars = [
+    "vix_daily_log_chg",
+    "sp500_daily_log_ret",
+    "hy_spread_daily_chg",
+    "ig_spread_daily_chg",
+    "term_spread_daily_chg",
+    "usd_strength_daily_log_chg",
+    "nfci_weekly_fill",
+]
+
+# combine in desired order
+plot_vars = tradfi_vars + crypto_vars
+
+# nicer names for plot
+var_labels = {
+    "vix_daily_log_chg": "VIX",
+    "sp500_daily_log_ret": "S&P 500",
+    "hy_spread_daily_chg": "HY Spread",
+    "ig_spread_daily_chg": "IG Spread",
+    "term_spread_daily_chg": "Term Spread",
+    "usd_strength_daily_log_chg": "USD Index",
+    "nfci_weekly_fill": "NFCI",
+    "usdt_mcap_daily_log_chg": "USDT Market Cap",
+    "usdc_mcap_daily_log_chg": "USDC Market Cap",
+    "dai_mcap_daily_log_chg": "DAI Market Cap",
+    "tusd_mcap_daily_log_chg": "TUSD Market Cap",
+    "tradingVol_btc+eth_daily_log_chg": "BTC + ETH Volume",
+}
+
+# smaller subtext under each variable
+var_subtexts = {
+    "vix_daily_log_chg": "daily log change",
+    "sp500_daily_log_ret": "daily log return",
+    "hy_spread_daily_chg": "daily absolute change",
+    "ig_spread_daily_chg": "daily absolute change",
+    "term_spread_daily_chg": "daily absolute change",
+    "usd_strength_daily_log_chg": "daily log change",
+    "nfci_weekly_fill": "weekly level, forward-filled to daily frequency",
+    "usdt_mcap_daily_log_chg": "daily log change in market cap",
+    "usdc_mcap_daily_log_chg": "daily log change in market cap",
+    "dai_mcap_daily_log_chg": "daily log change in market cap",
+    "tusd_mcap_daily_log_chg": "daily log change in market cap",
+    "tradingVol_btc+eth_daily_log_chg": "daily log change in BTC + ETH volume",
+}
+
+# calculate availability
+availability = []
+
+for var in plot_vars:
+    available_days = availability_df[var].notna().sum()
+    missing_days = total_days - available_days
+    availability_pct = available_days / total_days * 100
+    
+    availability.append({
+        "variable": var,
+        "label": var_labels.get(var, var),
+        "subtext": var_subtexts.get(var, ""),
+        "available_days": available_days,
+        "missing_days": missing_days,
+        "availability_pct": availability_pct,
+        "type": "Crypto" if var in crypto_vars else "Traditional finance"
+    })
+
+availability = pd.DataFrame(availability)
+
+# colors
+crypto_color = "#2D373C"
+tradfi_color = "#A5D7D2"
+missing_color = "#e0e0e0"
+subtext_color = "#7a7a7a"
+
+availability["color"] = np.where(
+    availability["type"] == "Crypto",
+    crypto_color,
+    tradfi_color
+)
+
+# reverse order so first variable appears at top
+availability_plot = availability.iloc[::-1].reset_index(drop=True)
+
+# numeric y positions
+y_pos = np.arange(len(availability_plot))
+
+# plot
+fig, ax = plt.subplots(figsize=(10, 6.8))
+
+# available part
+ax.barh(
+    y_pos,
+    availability_plot["available_days"],
+    color=availability_plot["color"],
+    edgecolor="none",
+    height=0.46
+)
+
+# missing part, stacked to the right
+ax.barh(
+    y_pos,
+    availability_plot["missing_days"],
+    left=availability_plot["available_days"],
+    color=missing_color,
+    edgecolor="none",
+    height=0.46
+)
+
+# remove default y-axis labels
+ax.set_yticks([])
+
+# custom y labels with subtext
+label_transform = blended_transform_factory(ax.transAxes, ax.transData)
+
+for i, row in availability_plot.iterrows():
+    ax.text(
+        -0.025,
+        i + 0.10,
+        row["label"],
+        transform=label_transform,
+        ha="right",
+        va="center",
+        fontsize=10.5,
+        color="#1f1f1f"
+    )
+    
+    ax.text(
+        -0.025,
+        i - 0.16,
+        row["subtext"],
+        transform=label_transform,
+        ha="right",
+        va="center",
+        fontsize=8.2,
+        color=subtext_color
+    )
+
+# add percentage labels
+for i, row in availability_plot.iterrows():
+    ax.text(
+        total_days + 20,
+        i,
+        f"{row['availability_pct']:.1f}%",
+        va="center",
+        fontsize=9,
+        color="#1f1f1f"
+    )
+
+# formatting
+ax.set_xlim(0, total_days + 180)
+
+# remove horizontal axis marks/ticks/grid
+ax.set_xlabel("")
+ax.set_xticks([])
+ax.tick_params(axis="x", bottom=False, labelbottom=False)
+ax.grid(False)
+
+# remove unnecessary spines
+ax.spines["top"].set_visible(False)
+ax.spines["right"].set_visible(False)
+ax.spines["bottom"].set_visible(False)
+ax.spines["left"].set_visible(False)
+
+# legend
+tradfi_patch = mpatches.Patch(color=tradfi_color, label="Traditional finance")
+crypto_patch = mpatches.Patch(color=crypto_color, label="Crypto")
+missing_patch = mpatches.Patch(color=missing_color, label="Missing")
+
+fig.legend(
+    handles=[tradfi_patch, crypto_patch, missing_patch],
+    loc="upper left",
+    bbox_to_anchor=(0.055, 0.90),
+    frameon=False,
+    fontsize=7,
+    handlelength=0.9,
+    handleheight=0.6,
+    handletextpad=0.4,
+    borderpad=0.2,
+    labelspacing=0.25
+)
+
+# add enough left margin for custom labels
+fig.subplots_adjust(left=0.32, right=0.88, top=0.90, bottom=0.08)
+
+# save graph
+"""
+fig.savefig(
+    "data_availability_graph.png",
+    dpi=600,
+    bbox_inches="tight",
+    facecolor="white"
+)
+"""
+
+plt.show()
