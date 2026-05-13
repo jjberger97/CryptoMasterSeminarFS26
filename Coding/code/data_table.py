@@ -473,7 +473,7 @@ data["nfci"] = nfci
 
 #%%------- MERGE CLEAN DATA FRAMES
 # create merged dataset
-merged_full = None
+data_table = None
 
 for name, df in data.items():
     
@@ -487,29 +487,29 @@ for name, df in data.items():
         raise ValueError(f"{name} has {temp.shape[1]} columns, expected 2.")
     
     # merge
-    if merged_full is None:
-        merged_full = temp
+    if data_table is None:
+        data_table = temp
     else:
-        merged_full = pd.merge(
-            merged_full,
+        data_table = pd.merge(
+            data_table,
             temp,
             on="date",
             how="outer"
         )
 
 # sort by date
-merged_full = merged_full.sort_values("date").reset_index(drop=True)
+data_table = data_table.sort_values("date").reset_index(drop=True)
 
 # filter sample period
-merged_full = merged_full[
-    (merged_full["date"] >= pd.to_datetime("2020-01-01").date()) &
-    (merged_full["date"] <= pd.to_datetime("2025-12-31").date())
+data_table = data_table[
+    (data_table["date"] >= pd.to_datetime("2020-01-01").date()) &
+    (data_table["date"] <= pd.to_datetime("2025-12-31").date())
 ].reset_index(drop=True)
 
 # check 
-print(merged_full.head())
-print(merged_full.tail())
-print(merged_full.info())
+print(data_table.head())
+print(data_table.tail())
+print(data_table.info())
 
 
 #%%------- DATA AVAILABILITY GRAPH
@@ -528,7 +528,7 @@ full_calendar = pd.DataFrame({
 # merge onto full calendar to make sure every calendar day is counted
 availability_df = pd.merge(
     full_calendar,
-    merged_full,
+    data_table,
     on="date",
     how="left"
 )
