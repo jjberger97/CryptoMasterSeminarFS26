@@ -260,6 +260,7 @@ data["tusd"] = tusd
 
 
 #%% FDUSD Market Cap - Independent
+"""
 # create daily log changes
 
 fdusd = data_raw["fdusd"].copy()
@@ -284,7 +285,7 @@ fdusd = fdusd[["date", "fdusd_mcap_daily_log_chg"]].copy()
 
 # store clean 
 data["fdusd"] = fdusd
-
+"""
 
 #%% BTC + ETH Trading Volume - Independent
 # create daily log change of combined BTC and ETH volume
