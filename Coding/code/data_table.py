@@ -511,6 +511,13 @@ print(data_table.head())
 print(data_table.tail())
 print(data_table.info())
 
+# save as csv
+output_path = "data_table.csv"
+
+data_table.to_csv(
+    output_path,
+    index=False
+)
 
 #%%------- DATA AVAILABILITY GRAPH
 
