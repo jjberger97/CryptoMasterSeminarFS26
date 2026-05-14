@@ -28,6 +28,16 @@ files = {
     "usdc": "usdc-usd-max.csv",
     "dai": "dai-usd-max.csv",
     "tusd": "tusd-usd-max.csv",
+    "stablecoin_netflow_erc20": "All Stablecoins(ERC20) Exchange Netflow (Total) - All Exchanges - Day.csv",
+    "usdt_netflow_trc20": "Tether USD(TRC20) Exchange Netflow (Total) - All Exchanges - Day.csv",
+    "stablecoin_reserve_erc20": "All Stablecoins(ERC20) Exchange Reserve - All Exchanges - Day.csv",
+    "usdt_reserve_trc20": "Tether USD(TRC20) Exchange Reserve - All Exchanges - Day.csv",
+    "btc_open_interest": "Bitcoin Open Interest - All Exchanges, All Symbol - Day.csv",
+    "eth_open_interest": "Ethereum Open Interest - All Exchanges, All Symbol - Day.csv",
+    "btc_funding_rate": "Bitcoin Funding Rates - All Exchanges - Day.csv",
+    "eth_funding_rate": "Ethereum Funding Rates - All Exchanges - Day.csv",
+    "stablecoin_supply_erc20": "All Stablecoins(ERC20) Total Supply - Day.csv",
+    "usdt_supply_trc20": "Tether USD(TRC20) Supply Total - Day.csv"
     # "fdusd": "fdusd-usd-max.csv", # removed due to low data availability
 }
 
@@ -290,6 +300,407 @@ fdusd = fdusd[["date", "fdusd_mcap_daily_log_chg"]].copy()
 data["fdusd"] = fdusd
 """
 
+#%% Aggregate Stablecoin Supply - Independent
+# daily log change of All Stablecoins(ERC20) supply + USDT TRON supply
+
+# ERC20 aggregate stablecoin supply
+stablecoin_supply_erc20 = data_raw["stablecoin_supply_erc20"].copy()
+
+# keep only date and supply
+stablecoin_supply_erc20 = stablecoin_supply_erc20[["Datetime", "Total Supply"]].copy()
+
+# convert date column
+stablecoin_supply_erc20["date"] = pd.to_datetime(
+    stablecoin_supply_erc20["Datetime"],
+    utc=True
+).dt.date
+
+# convert supply to numeric
+stablecoin_supply_erc20["stablecoin_supply_erc20"] = pd.to_numeric(
+    stablecoin_supply_erc20["Total Supply"],
+    errors="coerce"
+)
+
+# keep final level
+stablecoin_supply_erc20 = stablecoin_supply_erc20[
+    ["date", "stablecoin_supply_erc20"]
+].copy()
+
+
+# USDT TRON supply
+usdt_supply_trc20 = data_raw["usdt_supply_trc20"].copy()
+
+# keep only date and supply
+# note: this file uses "Supply Total", not "Total Supply"
+usdt_supply_trc20 = usdt_supply_trc20[["Datetime", "Supply Total"]].copy()
+
+# convert date column
+usdt_supply_trc20["date"] = pd.to_datetime(
+    usdt_supply_trc20["Datetime"],
+    utc=True
+).dt.date
+
+# convert supply to numeric
+usdt_supply_trc20["usdt_supply_trc20"] = pd.to_numeric(
+    usdt_supply_trc20["Supply Total"],
+    errors="coerce"
+)
+
+# keep final level
+usdt_supply_trc20 = usdt_supply_trc20[
+    ["date", "usdt_supply_trc20"]
+].copy()
+
+
+# merge ERC20 and TRON supply
+stablecoin_supply_total = pd.merge(
+    stablecoin_supply_erc20,
+    usdt_supply_trc20,
+    on="date",
+    how="outer"
+)
+
+# sort from oldest to newest before computing log change
+stablecoin_supply_total = stablecoin_supply_total.sort_values("date").reset_index(drop=True)
+
+# aggregate stablecoin supply level
+stablecoin_supply_total["stablecoin_supply_total"] = (
+    stablecoin_supply_total["stablecoin_supply_erc20"] +
+    stablecoin_supply_total["usdt_supply_trc20"]
+)
+
+# compute daily log change: ln(supply_t / supply_t-1)
+stablecoin_supply_total["stablecoin_supply_daily_log_chg"] = np.log(
+    stablecoin_supply_total["stablecoin_supply_total"] /
+    stablecoin_supply_total["stablecoin_supply_total"].shift(1)
+)
+
+# only final format for analysis
+stablecoin_supply_total_final = stablecoin_supply_total[
+    ["date", "stablecoin_supply_daily_log_chg"]
+].copy()
+
+# store clean
+data["stablecoin_supply"] = stablecoin_supply_total_final
+
+
+#%% Exchange Netflow - Independent
+# daily netflow level, scaled by aggregate stablecoin supply
+
+# ERC20 stablecoin exchange netflow
+stablecoin_netflow_erc20 = data_raw["stablecoin_netflow_erc20"].copy()
+
+# convert date column
+stablecoin_netflow_erc20["date"] = pd.to_datetime(
+    stablecoin_netflow_erc20["Datetime"],
+    utc=True
+).dt.date
+
+# convert netflow to numeric
+stablecoin_netflow_erc20["stablecoin_netflow_erc20"] = pd.to_numeric(
+    stablecoin_netflow_erc20["Exchange Netflow (Total)"],
+    errors="coerce"
+)
+
+# keep final level
+stablecoin_netflow_erc20 = stablecoin_netflow_erc20[
+    ["date", "stablecoin_netflow_erc20"]
+].copy()
+
+# USDT TRON exchange netflow
+usdt_netflow_trc20 = data_raw["usdt_netflow_trc20"].copy()
+
+# convert date column
+usdt_netflow_trc20["date"] = pd.to_datetime(
+    usdt_netflow_trc20["Datetime"],
+    utc=True
+).dt.date
+
+# convert netflow to numeric
+usdt_netflow_trc20["usdt_netflow_trc20"] = pd.to_numeric(
+    usdt_netflow_trc20["Exchange Netflow (Total)"],
+    errors="coerce"
+)
+
+# keep final level
+usdt_netflow_trc20 = usdt_netflow_trc20[
+    ["date", "usdt_netflow_trc20"]
+].copy()
+
+# merge ERC20 and TRON netflows
+exchange_netflow = pd.merge(
+    stablecoin_netflow_erc20,
+    usdt_netflow_trc20,
+    on="date",
+    how="outer"
+)
+
+# sort
+exchange_netflow = exchange_netflow.sort_values("date").reset_index(drop=True)
+
+# combined netflow level
+exchange_netflow["stablecoin_exchange_netflow_total"] = (
+    exchange_netflow["stablecoin_netflow_erc20"] +
+    exchange_netflow["usdt_netflow_trc20"]
+)
+
+# merge aggregate stablecoin supply level for scaling
+exchange_netflow = pd.merge(
+    exchange_netflow,
+    stablecoin_supply_total[["date", "stablecoin_supply_total"]],
+    on="date",
+    how="left"
+)
+
+# scale combined netflow by aggregate stablecoin supply
+exchange_netflow["stablecoin_exchange_netflow_scaled"] = (
+    exchange_netflow["stablecoin_exchange_netflow_total"] /
+    exchange_netflow["stablecoin_supply_total"]
+)
+
+# only final format
+exchange_netflow = exchange_netflow[
+    ["date", "stablecoin_exchange_netflow_scaled"]
+].copy()
+
+# store clean
+data["exchange_netflow"] = exchange_netflow
+
+
+#%% Open Interest - Independent
+# daily log change of combined BTC and ETH open interest
+
+# BTC open interest
+btc_open_interest = data_raw["btc_open_interest"].copy()
+
+# convert date column
+btc_open_interest["date"] = pd.to_datetime(
+    btc_open_interest["Datetime"],
+    utc=True
+).dt.date
+
+# convert open interest to numeric
+btc_open_interest["btc_open_interest"] = pd.to_numeric(
+    btc_open_interest["Open Interest"],
+    errors="coerce"
+)
+
+# keep final level
+btc_open_interest = btc_open_interest[
+    ["date", "btc_open_interest"]
+].copy()
+
+
+# ETH open interest
+eth_open_interest = data_raw["eth_open_interest"].copy()
+
+# convert date column
+eth_open_interest["date"] = pd.to_datetime(
+    eth_open_interest["Datetime"],
+    utc=True
+).dt.date
+
+# convert open interest to numeric
+eth_open_interest["eth_open_interest"] = pd.to_numeric(
+    eth_open_interest["Open Interest"],
+    errors="coerce"
+)
+
+# keep final level
+eth_open_interest = eth_open_interest[
+    ["date", "eth_open_interest"]
+].copy()
+
+
+# merge BTC and ETH open interest
+open_interest = pd.merge(
+    btc_open_interest,
+    eth_open_interest,
+    on="date",
+    how="outer"
+)
+
+# sort
+open_interest = open_interest.sort_values("date").reset_index(drop=True)
+
+# combined BTC + ETH open interest level
+open_interest["btc_eth_open_interest_total"] = (
+    open_interest["btc_open_interest"] +
+    open_interest["eth_open_interest"]
+)
+
+# compute daily log change: ln(open_interest_t / open_interest_t-1)
+open_interest["btc_eth_open_interest_daily_log_chg"] = np.log(
+    open_interest["btc_eth_open_interest_total"] /
+    open_interest["btc_eth_open_interest_total"].shift(1)
+)
+
+# only final format
+open_interest = open_interest[
+    ["date", "btc_eth_open_interest_daily_log_chg"]
+].copy()
+
+# store clean
+data["open_interest"] = open_interest
+
+
+#%% Funding Rates - Independent
+# daily average of BTC and ETH funding rates
+
+# BTC funding rate
+btc_funding_rate = data_raw["btc_funding_rate"].copy()
+
+# convert date column
+btc_funding_rate["date"] = pd.to_datetime(
+    btc_funding_rate["Datetime"],
+    utc=True
+).dt.date
+
+# convert funding rate to numeric
+btc_funding_rate["btc_funding_rate"] = pd.to_numeric(
+    btc_funding_rate["Funding Rates"],
+    errors="coerce"
+)
+
+# keep final level
+btc_funding_rate = btc_funding_rate[
+    ["date", "btc_funding_rate"]
+].copy()
+
+
+# ETH funding rate
+eth_funding_rate = data_raw["eth_funding_rate"].copy()
+
+# convert date column
+eth_funding_rate["date"] = pd.to_datetime(
+    eth_funding_rate["Datetime"],
+    utc=True
+).dt.date
+
+# convert funding rate to numeric
+eth_funding_rate["eth_funding_rate"] = pd.to_numeric(
+    eth_funding_rate["Funding Rates"],
+    errors="coerce"
+)
+
+# keep final level
+eth_funding_rate = eth_funding_rate[
+    ["date", "eth_funding_rate"]
+].copy()
+
+
+# merge BTC and ETH funding rates
+funding_rates = pd.merge(
+    btc_funding_rate,
+    eth_funding_rate,
+    on="date",
+    how="outer"
+)
+
+# sort
+funding_rates = funding_rates.sort_values("date").reset_index(drop=True)
+
+# average BTC and ETH funding rates
+funding_rates["btc_eth_funding_rate_avg"] = funding_rates[
+    ["btc_funding_rate", "eth_funding_rate"]
+].mean(axis=1)
+
+# only final format
+funding_rates = funding_rates[
+    ["date", "btc_eth_funding_rate_avg"]
+].copy()
+
+# store clean
+data["funding_rates"] = funding_rates
+
+
+#%% Exchange Reserves - Independent
+# daily log change of combined ERC20 stablecoin reserves + USDT TRON reserves
+
+# ERC20 stablecoin exchange reserves
+stablecoin_reserve_erc20 = data_raw["stablecoin_reserve_erc20"].copy()
+
+# keep only date and reserve
+stablecoin_reserve_erc20 = stablecoin_reserve_erc20[
+    ["Datetime", "Exchange Reserve"]
+].copy()
+
+# convert date column
+stablecoin_reserve_erc20["date"] = pd.to_datetime(
+    stablecoin_reserve_erc20["Datetime"],
+    utc=True
+).dt.date
+
+# convert reserve to numeric
+stablecoin_reserve_erc20["stablecoin_reserve_erc20"] = pd.to_numeric(
+    stablecoin_reserve_erc20["Exchange Reserve"],
+    errors="coerce"
+)
+
+# keep final level
+stablecoin_reserve_erc20 = stablecoin_reserve_erc20[
+    ["date", "stablecoin_reserve_erc20"]
+].copy()
+
+
+# USDT TRON exchange reserves
+usdt_reserve_trc20 = data_raw["usdt_reserve_trc20"].copy()
+
+# keep only date and reserve
+usdt_reserve_trc20 = usdt_reserve_trc20[
+    ["Datetime", "Reserve"]
+].copy()
+
+# convert date column
+usdt_reserve_trc20["date"] = pd.to_datetime(
+    usdt_reserve_trc20["Datetime"],
+    utc=True
+).dt.date
+
+# convert reserve to numeric
+usdt_reserve_trc20["usdt_reserve_trc20"] = pd.to_numeric(
+    usdt_reserve_trc20["Reserve"],
+    errors="coerce"
+)
+
+# keep final level
+usdt_reserve_trc20 = usdt_reserve_trc20[
+    ["date", "usdt_reserve_trc20"]
+].copy()
+
+
+# merge ERC20 and TRON reserves
+exchange_reserves = pd.merge(
+    stablecoin_reserve_erc20,
+    usdt_reserve_trc20,
+    on="date",
+    how="outer"
+)
+
+# sort
+exchange_reserves = exchange_reserves.sort_values("date").reset_index(drop=True)
+
+# combined exchange reserve level
+exchange_reserves["stablecoin_exchange_reserve_total"] = (
+    exchange_reserves["stablecoin_reserve_erc20"] +
+    exchange_reserves["usdt_reserve_trc20"]
+)
+
+# compute daily log change: ln(reserve_t / reserve_t-1)
+exchange_reserves["stablecoin_exchange_reserve_daily_log_chg"] = np.log(
+    exchange_reserves["stablecoin_exchange_reserve_total"] /
+    exchange_reserves["stablecoin_exchange_reserve_total"].shift(1)
+)
+
+# only final format
+exchange_reserves = exchange_reserves[
+    ["date", "stablecoin_exchange_reserve_daily_log_chg"]
+].copy()
+
+# store clean
+data["exchange_reserves"] = exchange_reserves
+
+
 #%% BTC + ETH Trading Volume - Independent
 # create daily log change of combined BTC and ETH volume
 
@@ -546,11 +957,16 @@ print(f"Total days in sample: {total_days}")
 
 # classify variables
 crypto_vars = [
+    "stablecoin_supply_daily_log_chg",
+    "stablecoin_exchange_netflow_scaled",
+    "stablecoin_exchange_reserve_daily_log_chg",
+    "btc_eth_open_interest_daily_log_chg",
+    "btc_eth_funding_rate_avg",
+    "tradingVol_btc+eth_daily_log_chg",
     "usdt_mcap_daily_log_chg",
     "usdc_mcap_daily_log_chg",
     "dai_mcap_daily_log_chg",
     "tusd_mcap_daily_log_chg",
-    "tradingVol_btc+eth_daily_log_chg",
 ]
 
 tradfi_vars = [
@@ -575,11 +991,16 @@ var_labels = {
     "term_spread_daily_chg": "Term Spread",
     "usd_strength_daily_log_chg": "USD Index",
     "nfci_weekly_fill": "NFCI",
+    "stablecoin_supply_daily_log_chg": "Stablecoin Supply",
+    "stablecoin_exchange_netflow_scaled": "Exchange Netflow",
+    "stablecoin_exchange_reserve_daily_log_chg": "Exchange Reserves",
+    "btc_eth_open_interest_daily_log_chg": "Open Interest",
+    "btc_eth_funding_rate_avg": "Funding Rates",
+    "tradingVol_btc+eth_daily_log_chg": "BTC + ETH Volume",
     "usdt_mcap_daily_log_chg": "USDT Market Cap",
     "usdc_mcap_daily_log_chg": "USDC Market Cap",
     "dai_mcap_daily_log_chg": "DAI Market Cap",
     "tusd_mcap_daily_log_chg": "TUSD Market Cap",
-    "tradingVol_btc+eth_daily_log_chg": "BTC + ETH Volume",
 }
 
 # smaller subtext under each variable
@@ -590,12 +1011,17 @@ var_subtexts = {
     "ig_spread_daily_chg": "daily absolute change",
     "term_spread_daily_chg": "daily absolute change",
     "usd_strength_daily_log_chg": "daily log change",
-    "nfci_weekly_fill": "weekly level, forward-filled to daily frequency",
+    "nfci_weekly_fill": "weekly level, aligned to publication date and forward-filled",
+    "stablecoin_supply_daily_log_chg": "daily log change in ERC20 stablecoins + USDT TRON supply",
+    "stablecoin_exchange_netflow_scaled": "daily netflow scaled by aggregate stablecoin supply",
+    "stablecoin_exchange_reserve_daily_log_chg": "daily log change in ERC20 + TRON exchange reserves",
+    "btc_eth_open_interest_daily_log_chg": "daily log change in BTC + ETH open interest",
+    "btc_eth_funding_rate_avg": "daily average of BTC + ETH funding rates",
+    "tradingVol_btc+eth_daily_log_chg": "daily log change in BTC + ETH volume",
     "usdt_mcap_daily_log_chg": "daily log change in market cap",
     "usdc_mcap_daily_log_chg": "daily log change in market cap",
     "dai_mcap_daily_log_chg": "daily log change in market cap",
     "tusd_mcap_daily_log_chg": "daily log change in market cap",
-    "tradingVol_btc+eth_daily_log_chg": "daily log change in BTC + ETH volume",
 }
 
 # calculate availability
@@ -637,7 +1063,7 @@ availability_plot = availability.iloc[::-1].reset_index(drop=True)
 y_pos = np.arange(len(availability_plot))
 
 # plot
-fig, ax = plt.subplots(figsize=(10, 6.8))
+fig, ax = plt.subplots(figsize=(10, 8.4))
 
 # available part
 ax.barh(
@@ -672,7 +1098,7 @@ for i, row in availability_plot.iterrows():
         transform=label_transform,
         ha="right",
         va="center",
-        fontsize=10.5,
+        fontsize=9.8,
         color="#1f1f1f"
     )
     
@@ -683,7 +1109,7 @@ for i, row in availability_plot.iterrows():
         transform=label_transform,
         ha="right",
         va="center",
-        fontsize=8.2,
+        fontsize=7.6,
         color=subtext_color
     )
 
