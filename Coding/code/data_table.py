@@ -5,6 +5,7 @@ from urllib.parse import quote
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from matplotlib.transforms import blended_transform_factory
+import matplotlib.dates as mdates
 
 
 #%%------- IMPORT RAW DATA FROM GITHUB
@@ -913,7 +914,7 @@ data_table = data_table.sort_values("date").reset_index(drop=True)
 
 # filter sample period
 data_table = data_table[
-    (data_table["date"] >= pd.to_datetime("2020-01-01").date()) &
+    (data_table["date"] >= pd.to_datetime("2015-01-01").date()) &
     (data_table["date"] <= pd.to_datetime("2025-12-31").date())
 ].reset_index(drop=True)
 
@@ -1063,7 +1064,7 @@ availability_plot = availability.iloc[::-1].reset_index(drop=True)
 y_pos = np.arange(len(availability_plot))
 
 # plot
-fig, ax = plt.subplots(figsize=(10, 8.4))
+fig, ax = plt.subplots(figsize=(12, 8.6))
 
 # available part
 ax.barh(
@@ -1093,7 +1094,7 @@ label_transform = blended_transform_factory(ax.transAxes, ax.transData)
 for i, row in availability_plot.iterrows():
     ax.text(
         -0.025,
-        i + 0.10,
+        i + 0.14,
         row["label"],
         transform=label_transform,
         ha="right",
@@ -1104,7 +1105,7 @@ for i, row in availability_plot.iterrows():
     
     ax.text(
         -0.025,
-        i - 0.16,
+        i - 0.20,
         row["subtext"],
         transform=label_transform,
         ha="right",
@@ -1144,30 +1145,276 @@ tradfi_patch = mpatches.Patch(color=tradfi_color, label="Traditional finance")
 crypto_patch = mpatches.Patch(color=crypto_color, label="Crypto")
 missing_patch = mpatches.Patch(color=missing_color, label="Missing")
 
-fig.legend(
+legend = fig.legend(
     handles=[tradfi_patch, crypto_patch, missing_patch],
     loc="upper left",
-    bbox_to_anchor=(0.055, 0.90),
+    bbox_to_anchor=(0.055, 0.91),
     frameon=False,
-    fontsize=7,
-    handlelength=0.9,
-    handleheight=0.6,
-    handletextpad=0.4,
-    borderpad=0.2,
-    labelspacing=0.25
+    fontsize=10,
+    handlelength=1.2,
+    handleheight=1.0,
+    handletextpad=0.5,
+    borderpad=0.3,
+    labelspacing=0.4
 )
 
+for text in legend.get_texts():
+    text.set_color("#1f1f1f")
+
 # add enough left margin for custom labels
-fig.subplots_adjust(left=0.32, right=0.88, top=0.90, bottom=0.08)
+fig.subplots_adjust(left=0.35, right=0.97, top=0.93, bottom=0.08)
 
 # save graph
-"""
+
 fig.savefig(
     "data_availability_graph.png",
     dpi=600,
     bbox_inches="tight",
     facecolor="white"
 )
-"""
+
+
+plt.show()
+
+
+#%%------- DATA AVAILABILITY TIMELINE GRAPH
+
+# use Palatino Linotype
+plt.rcParams["font.family"] = "Palatino Linotype"
+
+# create full daily calendar for extended availability period
+sample_start = pd.to_datetime("2015-01-01")
+sample_end = pd.to_datetime("2025-12-31")
+
+full_calendar = pd.DataFrame({
+    "date": pd.date_range(sample_start, sample_end, freq="D")
+})
+
+# make sure data_table date is datetime
+availability_source = data_table.copy()
+availability_source["date"] = pd.to_datetime(availability_source["date"])
+
+# merge onto full calendar to make sure every calendar day is counted
+availability_df = pd.merge(
+    full_calendar,
+    availability_source,
+    on="date",
+    how="left"
+)
+
+# classify variables
+crypto_vars = [
+    "stablecoin_supply_daily_log_chg",
+    "stablecoin_exchange_netflow_scaled",
+    "stablecoin_exchange_reserve_daily_log_chg",
+    "btc_eth_open_interest_daily_log_chg",
+    "btc_eth_funding_rate_avg",
+    "tradingVol_btc+eth_daily_log_chg",
+    "usdt_mcap_daily_log_chg",
+    "usdc_mcap_daily_log_chg",
+    "dai_mcap_daily_log_chg",
+    "tusd_mcap_daily_log_chg",
+]
+
+tradfi_vars = [
+    "vix_daily_log_chg",
+    "sp500_daily_log_ret",
+    "hy_spread_daily_chg",
+    "ig_spread_daily_chg",
+    "term_spread_daily_chg",
+    "usd_strength_daily_log_chg",
+    "nfci_weekly_fill",
+]
+
+# combine in desired order
+plot_vars = tradfi_vars + crypto_vars
+
+# nicer names for plot
+var_labels = {
+    "vix_daily_log_chg": "VIX",
+    "sp500_daily_log_ret": "S&P 500",
+    "hy_spread_daily_chg": "HY Spread",
+    "ig_spread_daily_chg": "IG Spread",
+    "term_spread_daily_chg": "Term Spread",
+    "usd_strength_daily_log_chg": "USD Index",
+    "nfci_weekly_fill": "NFCI",
+
+    "stablecoin_supply_daily_log_chg": "Stablecoin Supply",
+    "stablecoin_exchange_netflow_scaled": "Exchange Netflow",
+    "stablecoin_exchange_reserve_daily_log_chg": "Exchange Reserves",
+    "btc_eth_open_interest_daily_log_chg": "Open Interest",
+    "btc_eth_funding_rate_avg": "Funding Rates",
+    "tradingVol_btc+eth_daily_log_chg": "BTC + ETH Volume",
+    "usdt_mcap_daily_log_chg": "USDT Market Cap",
+    "usdc_mcap_daily_log_chg": "USDC Market Cap",
+    "dai_mcap_daily_log_chg": "DAI Market Cap",
+    "tusd_mcap_daily_log_chg": "TUSD Market Cap",
+}
+
+# smaller subtext under each variable
+var_subtexts = {
+    "vix_daily_log_chg": "daily log change",
+    "sp500_daily_log_ret": "daily log return",
+    "hy_spread_daily_chg": "daily absolute change",
+    "ig_spread_daily_chg": "daily absolute change",
+    "term_spread_daily_chg": "daily absolute change",
+    "usd_strength_daily_log_chg": "daily log change",
+    "nfci_weekly_fill": "weekly level, aligned to publication date and forward-filled",
+
+    "stablecoin_supply_daily_log_chg": "daily log change in ERC20 stablecoins + USDT TRON supply",
+    "stablecoin_exchange_netflow_scaled": "daily netflow scaled by aggregate stablecoin supply",
+    "stablecoin_exchange_reserve_daily_log_chg": "daily log change in ERC20 + TRON exchange reserves",
+    "btc_eth_open_interest_daily_log_chg": "daily log change in BTC + ETH open interest",
+    "btc_eth_funding_rate_avg": "daily average of BTC + ETH funding rates",
+    "tradingVol_btc+eth_daily_log_chg": "daily log change in BTC + ETH volume",
+    "usdt_mcap_daily_log_chg": "daily log change in market cap",
+    "usdc_mcap_daily_log_chg": "daily log change in market cap",
+    "dai_mcap_daily_log_chg": "daily log change in market cap",
+    "tusd_mcap_daily_log_chg": "daily log change in market cap",
+}
+
+# colors
+available_color = "#2D373C"
+missing_color = "#EAEBEC"
+subtext_color = "#7a7a7a"
+main_text_color = "#1f1f1f"
+
+# reverse order so first variable appears at top
+plot_vars_reversed = plot_vars[::-1]
+
+# convert dates to matplotlib date numbers
+x_dates = mdates.date2num(availability_df["date"])
+bar_width = 1.0
+
+# plot
+fig, ax = plt.subplots(figsize=(12, 8.6))
+
+# draw one timeline row per variable
+for i, var in enumerate(plot_vars_reversed):
+    
+    # availability indicator
+    is_available = availability_df[var].notna().astype(int)
+    
+    # draw missing background for full sample
+    ax.bar(
+        x_dates,
+        np.full(len(x_dates), 0.46),
+        bottom=i - 0.23,
+        width=bar_width,
+        color=missing_color,
+        edgecolor="none",
+        align="center"
+    )
+    
+    # draw available days
+    ax.bar(
+        x_dates[is_available == 1],
+        np.full(is_available.sum(), 0.46),
+        bottom=i - 0.23,
+        width=bar_width,
+        color=available_color,
+        edgecolor="none",
+        align="center"
+    )
+
+# remove default y labels
+ax.set_yticks([])
+
+# custom y labels with subtext
+label_transform = blended_transform_factory(ax.transAxes, ax.transData)
+
+for i, var in enumerate(plot_vars_reversed):
+    ax.text(
+        -0.018,
+        i + 0.14,
+        var_labels.get(var, var),
+        transform=label_transform,
+        ha="right",
+        va="center",
+        fontsize=9.8,
+        color=main_text_color
+    )
+    
+    ax.text(
+        -0.018,
+        i - 0.20,
+        var_subtexts.get(var, ""),
+        transform=label_transform,
+        ha="right",
+        va="center",
+        fontsize=7.4,
+        color=subtext_color
+    )
+
+# x-axis formatting: show only years
+ax.set_xlim(
+    mdates.date2num(sample_start),
+    mdates.date2num(sample_end)
+)
+
+ax.xaxis.set_major_locator(mdates.YearLocator())
+ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y"))
+
+# remove tick marks but keep year labels
+ax.tick_params(
+    axis="x",
+    length=0,
+    labelsize=8,
+    colors=main_text_color
+)
+
+# optional: light vertical lines at year changes
+for year in range(2015, 2027):
+    ax.axvline(
+        mdates.date2num(pd.to_datetime(f"{year}-01-01")),
+        color="#f0f0f0",
+        linewidth=0.7,
+        zorder=0
+    )
+
+# formatting
+ax.set_ylim(-0.7, len(plot_vars_reversed) - 0.3)
+ax.set_xlabel("")
+ax.grid(False)
+
+# remove spines
+ax.spines["top"].set_visible(False)
+ax.spines["right"].set_visible(False)
+ax.spines["bottom"].set_visible(False)
+ax.spines["left"].set_visible(False)
+
+# legend
+available_patch = mpatches.Patch(color=available_color, label="Available")
+missing_patch = mpatches.Patch(color=missing_color, label="Missing")
+
+legend = fig.legend(
+    handles=[available_patch, missing_patch],
+    loc="upper left",
+    bbox_to_anchor=(0.045, 0.90),
+    frameon=False,
+    fontsize=10,          # larger text
+    handlelength=1.2,     # larger color box width
+    handleheight=1.0,     # larger color box height
+    handletextpad=0.5,
+    borderpad=0.3,
+    labelspacing=0.4
+)
+
+for text in legend.get_texts():
+    text.set_color(main_text_color)
+
+# margins
+fig.subplots_adjust(left=0.35, right=0.97, top=0.93, bottom=0.08)
+
+# save graph
+
+fig.savefig(
+    "data_availability_timeline_graph.png",
+    dpi=600,
+    bbox_inches="tight",
+    facecolor="white"
+)
+
+
 
 plt.show()
