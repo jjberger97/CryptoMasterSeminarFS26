@@ -563,17 +563,15 @@ if len(regression_results) > 0:
  
 
 #%%------- PLOT
-# Use the regression results already created in this file
+# use the regression results already created in this file
 plot_results = regression_results.copy()
 
 # Keep only the actual crypto predictors, not controls
 plot_results = plot_results[plot_results["is_main_predictor"] == True].copy()
 
 
-# OPTIONAL: DROP DUPLICATE STABLECOIN GROUP SPECIFICATION
-
 # Since group_stablecoin_mcaps currently contains only stablecoin_supply_daily_log_chg,
-# it duplicates the standalone stablecoin regression. I would drop it for the visual.
+# it duplicates the standalone stablecoin regression
 plot_results = plot_results[
     plot_results["specification"] != "group_stablecoin_mcaps"
 ].copy()
@@ -610,7 +608,12 @@ plot_results["sig_05"] = (plot_results["p_value"] < 0.05).astype(int)
 plot_results["sig_01"] = (plot_results["p_value"] < 0.01).astype(int)
 
 
-# AGGREGATE TO PREDICTOR x DEPENDENT LEVEL
+# AGGREGATE TO PREDICTOR x DEPENDENT LEVEL ---
+# Keep only significant observations for coefficient summary
+# This means avg/std are based only on results that are significant at p < 0.10
+sig_plot_results = plot_results[plot_results["p_value"] < 0.10].copy()
+
+# Main summary: significance counts and strongest p-value
 dot_summary = (
     plot_results
     .groupby(["predictor_label", "dependent_label"])
@@ -622,6 +625,25 @@ dot_summary = (
         total_tests=("p_value", "count")
     )
     .reset_index()
+)
+
+# Coefficient summary among significant observations only
+coef_summary = (
+    sig_plot_results
+    .groupby(["predictor_label", "dependent_label"])
+    .agg(
+        avg_coef_sig=("coef", "mean"),
+        std_coef_sig=("coef", "std")
+    )
+    .reset_index()
+)
+
+# Merge coefficient summary back into dot_summary
+dot_summary = pd.merge(
+    dot_summary,
+    coef_summary,
+    on=["predictor_label", "dependent_label"],
+    how="left"
 )
 
 # Strongest significance found in each predictor-dependent cell
@@ -674,20 +696,20 @@ def size_from_count(n):
     if n == 0:
         return 0
     elif n == 1:
-        return 220
+        return 260
     elif n == 2:
-        return 420
+        return 520
     elif n == 3:
-        return 650
+        return 860
+    elif n == 4:
+        return 1250
     else:
-        return 900
+        return 1650
 
 dot_summary["dot_size"] = dot_summary["n_sig_10"].apply(size_from_count)
 
 
 # DOT COLOR RULE
-
-# Darker dot = stronger minimum p-value in that predictor-dependent cell
 def color_from_p(p):
     if pd.isna(p) or p >= 0.10:
         return "white"
@@ -705,29 +727,41 @@ dot_summary["dot_color"] = dot_summary["min_p"].apply(color_from_p)
 
 plt.rcParams["font.family"] = "Palatino Linotype"
 
-fig, ax = plt.subplots(figsize=(8.2, 4.8))
+fig, ax = plt.subplots(figsize=(10, 5.9))
 
-# Draw grid
-for x in range(len(col_order)):
-    for y in range(len(row_order)):
-        rect = plt.Rectangle(
-            (x - 0.5, y - 0.5),
-            1,
-            1,
-            fill=False,
-            edgecolor="lightgray",
-            linewidth=0.9
-        )
-        ax.add_patch(rect)
+# Draw only internal grid lines (no outer border)
+for x in range(1, len(col_order)):
+    ax.vlines(
+        x - 0.5,
+        ymin=-0.5,
+        ymax=len(row_order) - 0.5,
+        colors="lightgray",
+        linewidth=0.9,
+        zorder=1
+    )
 
-# Draw dots
+for y in range(1, len(row_order)):
+    ax.hlines(
+        y - 0.5,
+        xmin=-0.5,
+        xmax=len(col_order) - 0.5,
+        colors="lightgray",
+        linewidth=0.9,
+        zorder=1
+    )
+
+# Draw dots: dot on right side of cell, text on left side
 for _, row in dot_summary.iterrows():
 
     if row["dot_size"] > 0:
 
+        # Center dot in cell
+        dot_x = row["x_pos"]
+        dot_y = row["y_pos"]
+
         ax.scatter(
-            row["x_pos"],
-            row["y_pos"],
+            dot_x,
+            dot_y,
             s=row["dot_size"],
             facecolor=row["dot_color"],
             edgecolor="black",
@@ -735,40 +769,36 @@ for _, row in dot_summary.iterrows():
             zorder=3
         )
 
-    # star color: white for high-significance / dark dots, black otherwise
-    star_color = "white" if row["min_p"] < 0.05 else "black"
+        # Text color: white for darker dots, black otherwise
+        text_color = "white" if row["min_p"] < 0.05 else "black"
 
-    # stars inside dot
-    ax.text(
-        row["x_pos"],
-        row["y_pos"],
-        row["star_label"],
-        ha="center",
-        va="center",
-        fontsize=10,
-        fontweight="bold",
-        color=star_color,
-        zorder=4
-    )
+        # Direction of average coefficient among significant results
+        if row["avg_coef_sig"] > 0:
+            direction_label = "+"
+        elif row["avg_coef_sig"] < 0:
+            direction_label = "−"   # proper minus sign
+        else:
+            direction_label = "0"
 
-    # number of significant results in lower-right of cell
-    # only shown if at least one result is significant
-    if row["n_sig_10"] > 0:
         ax.text(
-        row["x_pos"] + 0.34,
-        row["y_pos"] + 0.32,
-        f"n={int(row['n_sig_10'])}",
-        ha="right",
-        va="bottom",
-        fontsize=8,
-        fontstyle="italic",
-        color="#46505A",
-        zorder=5
-    )
+            dot_x,
+            dot_y,
+            direction_label,
+            ha="center",
+            va="center",
+            fontsize=13,
+            fontweight="bold",
+            color=text_color,
+            zorder=4
+        )
 
 # Axis formatting
 ax.set_xticks(range(len(col_order)))
 ax.set_xticklabels(col_order, fontsize=11)
+
+# Move column headers to the top
+ax.xaxis.tick_top()
+ax.tick_params(axis="x", labeltop=True, labelbottom=False, length=0, pad=8)
 
 ax.set_yticks(range(len(row_order)))
 ax.set_yticklabels(row_order, fontsize=11)
@@ -781,17 +811,22 @@ ax.tick_params(length=0)
 for spine in ax.spines.values():
     spine.set_visible(False)
 
+plt.subplots_adjust(bottom=0.16)
+
+plt.tight_layout(rect=[0.03, 0.125, 0.98, 0.96])
 
 fig.text(
     0.5,
-    0.015,
-    "Dot size = number of significant results across horizons/specifications (p < 0.10); "
-    "*, **, *** = strongest significance in cell",
+    0.032,
+    "Dot size = recurrence of significant results across horizons/specifications (p < 0.10)\n"
+    "Dot color = strongest significance in cell: black < 1%, dark < 5%, light < 10%\n"
+    "+/− = average coefficient direction among significant results",
     ha="center",
-    fontsize=9
+    va="bottom",
+    fontsize=7.8,
+    color="#46505A",
+    linespacing=1.25
 )
-
-plt.tight_layout(rect=[0, 0.05, 1, 1])
 
 # Save into the same regression_results folder you already use
 plt.savefig(
