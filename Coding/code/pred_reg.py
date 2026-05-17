@@ -820,7 +820,8 @@ fig.text(
     0.032,
     "Dot size = recurrence of significant results across horizons/specifications (p < 0.10)\n"
     "Dot color = strongest significance in cell: black < 1%, dark < 5%, light < 10%\n"
-    "+/− = average coefficient direction among significant results",
+    "+/− = average coefficient direction among significant results\n"
+    "Signs show raw predicted response. Risk-on = S&P 500 up, VIX down, HY/IG spreads down",
     ha="center",
     va="bottom",
     fontsize=7.8,
