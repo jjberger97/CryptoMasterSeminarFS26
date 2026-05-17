@@ -1,0 +1,25 @@
+specification,caused,causing,test,statistic,p_value,df,significant_10pct,significant_5pct,significant_1pct,lag_order,nobs,direction
+var_btc_eth_funding_rate_avg,btc_eth_funding_rate_avg,hy_spread_daily_chg,granger_causality_f_test,3.235503394954352,0.07208869469368058,"(1, 9870)",True,False,False,1,1418,risk_to_crypto
+var_btc_eth_funding_rate_avg,btc_eth_funding_rate_avg,ig_spread_daily_chg,granger_causality_f_test,0.6299552783670571,0.4273907991196564,"(1, 9870)",False,False,False,1,1418,risk_to_crypto
+var_btc_eth_funding_rate_avg,btc_eth_funding_rate_avg,sp500_daily_log_ret,granger_causality_f_test,25.78921949861269,3.8776584618040775e-07,"(1, 9870)",True,True,True,1,1418,risk_to_crypto
+var_btc_eth_funding_rate_avg,btc_eth_funding_rate_avg,vix_daily_log_chg,granger_causality_f_test,0.24072657170907383,0.623692745646424,"(1, 9870)",False,False,False,1,1418,risk_to_crypto
+var_btc_eth_open_interest_daily_log_chg,btc_eth_open_interest_daily_log_chg,hy_spread_daily_chg,granger_causality_f_test,1.9590835910440094,0.1616427893684942,"(1, 9870)",False,False,False,1,1418,risk_to_crypto
+var_btc_eth_open_interest_daily_log_chg,btc_eth_open_interest_daily_log_chg,ig_spread_daily_chg,granger_causality_f_test,12.011878078563347,0.0005308743776548055,"(1, 9870)",True,True,True,1,1418,risk_to_crypto
+var_btc_eth_open_interest_daily_log_chg,btc_eth_open_interest_daily_log_chg,sp500_daily_log_ret,granger_causality_f_test,0.005463065920821553,0.9410814628080435,"(1, 9870)",False,False,False,1,1418,risk_to_crypto
+var_btc_eth_open_interest_daily_log_chg,btc_eth_open_interest_daily_log_chg,vix_daily_log_chg,granger_causality_f_test,3.096765559761029,0.07847898590573942,"(1, 9870)",True,False,False,1,1418,risk_to_crypto
+var_stablecoin_exchange_netflow_scaled,stablecoin_exchange_netflow_scaled,hy_spread_daily_chg,granger_causality_f_test,0.4871847609615043,0.4852022557053991,"(1, 9870)",False,False,False,1,1418,risk_to_crypto
+var_stablecoin_exchange_netflow_scaled,stablecoin_exchange_netflow_scaled,ig_spread_daily_chg,granger_causality_f_test,4.733532095631122,0.02960372547202202,"(1, 9870)",True,True,False,1,1418,risk_to_crypto
+var_stablecoin_exchange_netflow_scaled,stablecoin_exchange_netflow_scaled,sp500_daily_log_ret,granger_causality_f_test,0.25859062428205465,0.611101437823663,"(1, 9870)",False,False,False,1,1418,risk_to_crypto
+var_stablecoin_exchange_netflow_scaled,stablecoin_exchange_netflow_scaled,vix_daily_log_chg,granger_causality_f_test,1.3177712990930734,0.25102024700162257,"(1, 9870)",False,False,False,1,1418,risk_to_crypto
+var_stablecoin_exchange_reserve_daily_log_chg,stablecoin_exchange_reserve_daily_log_chg,hy_spread_daily_chg,granger_causality_f_test,0.18449552971758612,0.6675473585700218,"(1, 9870)",False,False,False,1,1418,risk_to_crypto
+var_stablecoin_exchange_reserve_daily_log_chg,stablecoin_exchange_reserve_daily_log_chg,ig_spread_daily_chg,granger_causality_f_test,3.6620080788062968,0.05569539785242794,"(1, 9870)",True,False,False,1,1418,risk_to_crypto
+var_stablecoin_exchange_reserve_daily_log_chg,stablecoin_exchange_reserve_daily_log_chg,sp500_daily_log_ret,granger_causality_f_test,0.1349705457086988,0.7133409460827829,"(1, 9870)",False,False,False,1,1418,risk_to_crypto
+var_stablecoin_exchange_reserve_daily_log_chg,stablecoin_exchange_reserve_daily_log_chg,vix_daily_log_chg,granger_causality_f_test,1.0629514514935572,0.3025682540907602,"(1, 9870)",False,False,False,1,1418,risk_to_crypto
+var_stablecoin_supply_daily_log_chg,stablecoin_supply_daily_log_chg,hy_spread_daily_chg,granger_causality_f_test,4.912573212998351,0.026684606968034798,"(1, 9870)",True,True,False,1,1418,risk_to_crypto
+var_stablecoin_supply_daily_log_chg,stablecoin_supply_daily_log_chg,ig_spread_daily_chg,granger_causality_f_test,0.0781839526488648,0.7797795739190871,"(1, 9870)",False,False,False,1,1418,risk_to_crypto
+var_stablecoin_supply_daily_log_chg,stablecoin_supply_daily_log_chg,sp500_daily_log_ret,granger_causality_f_test,0.9134164918169038,0.33923295231815287,"(1, 9870)",False,False,False,1,1418,risk_to_crypto
+var_stablecoin_supply_daily_log_chg,stablecoin_supply_daily_log_chg,vix_daily_log_chg,granger_causality_f_test,1.7466391223158273,0.18633043205961325,"(1, 9870)",False,False,False,1,1418,risk_to_crypto
+var_tradingVol_btc+eth_daily_log_chg,tradingVol_btc+eth_daily_log_chg,hy_spread_daily_chg,granger_causality_f_test,0.015779942022736606,0.9000366830097624,"(1, 9870)",False,False,False,1,1418,risk_to_crypto
+var_tradingVol_btc+eth_daily_log_chg,tradingVol_btc+eth_daily_log_chg,ig_spread_daily_chg,granger_causality_f_test,2.106079316091464,0.14674657116323347,"(1, 9870)",False,False,False,1,1418,risk_to_crypto
+var_tradingVol_btc+eth_daily_log_chg,tradingVol_btc+eth_daily_log_chg,sp500_daily_log_ret,granger_causality_f_test,9.760128763615661,0.0017885392576946586,"(1, 9870)",True,True,True,1,1418,risk_to_crypto
+var_tradingVol_btc+eth_daily_log_chg,tradingVol_btc+eth_daily_log_chg,vix_daily_log_chg,granger_causality_f_test,14.674582290992547,0.00012854898916715818,"(1, 9870)",True,True,True,1,1418,risk_to_crypto
