@@ -2,10 +2,10 @@
 import pandas as pd
 import numpy as np
 from urllib.parse import quote
-import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
-from matplotlib.transforms import blended_transform_factory
-import matplotlib.dates as mdates
+#import matplotlib.pyplot as plt
+#import matplotlib.patches as mpatches
+#from matplotlib.transforms import blended_transform_factory
+#import matplotlib.dates as mdates
 
 
 #%%------- IMPORT RAW DATA FROM GITHUB
@@ -57,59 +57,6 @@ for name, file in files.items():
 data = {} 
 
 
-#%% VIX - Dependent
-# use daily log change closee
-
-vix = data_raw["vix"].copy()
-
-# only date and data
-vix = vix[["DATE", "CLOSE"]].copy()
-
-# convert date col
-vix["date"] = pd.to_datetime(vix["DATE"], format="%m/%d/%Y").dt.date
-
-# convert close to numeric
-vix["CLOSE"] = pd.to_numeric(vix["CLOSE"], errors="coerce")
-
-# sort 
-vix = vix.sort_values("date").reset_index(drop=True)
-
-# compute daily log change: ln(vix_t / vix_t-1)
-vix["vix_daily_log_chg"] = np.log(vix["CLOSE"] / vix["CLOSE"].shift(1))
-
-# only final format
-vix = vix[["date", "vix_daily_log_chg"]].copy()
-
-# store clean 
-data["vix"] = vix
-
-
-#%% S&P 500 - Dependent
-# use daily log change
-
-sp500 = data_raw["sp500"].copy()
-
-# only date and data
-sp500 = sp500[["observation_date", "SP500"]].copy()
-
-# convert date col
-sp500["date"] = pd.to_datetime(sp500["observation_date"]).dt.date
-
-# convert snp500 value to numeric
-sp500["SP500"] = pd.to_numeric(sp500["SP500"], errors="coerce")
-
-# sort
-sp500 = sp500.sort_values("date").reset_index(drop=True)
-
-# compute daily log return: ln(sp500_t / sp500_t-1)
-sp500["sp500_daily_log_ret"] = np.log(sp500["SP500"] / sp500["SP500"].shift(1))
-
-# only final format
-sp500 = sp500[["date", "sp500_daily_log_ret"]].copy()
-
-# store clean 
-data["sp500"] = sp500
-
 
 #%% US HY Spread - Dependent
 # create daily changes
@@ -125,11 +72,16 @@ hy_spread["date"] = pd.to_datetime(hy_spread["observation_date"]).dt.date
 # convert spread to numeric
 hy_spread["BAMLH0A0HYM2"] = pd.to_numeric(hy_spread["BAMLH0A0HYM2"], errors="coerce")
 
-# sort 
-hy_spread = hy_spread.sort_values("date").reset_index(drop=True)
+# drop NA and sort
+hy_spread = (
+    hy_spread
+    .dropna(subset=["BAMLH0A0HYM2"])
+    .sort_values("date")
+    .reset_index(drop=True)
+)
 
 # compute daily change: spread_t - spread_t-1
-hy_spread["hy_spread_daily_chg"] = (hy_spread["BAMLH0A0HYM2"] - hy_spread["BAMLH0A0HYM2"].shift(1))
+hy_spread["hy_spread_daily_chg"] = hy_spread["BAMLH0A0HYM2"].diff()
 
 # only final format
 hy_spread = hy_spread[["date", "hy_spread_daily_chg"]].copy()
@@ -152,11 +104,16 @@ ig_spread["date"] = pd.to_datetime(ig_spread["observation_date"]).dt.date
 # convert spread to numeric
 ig_spread["BAMLC0A0CM"] = pd.to_numeric(ig_spread["BAMLC0A0CM"], errors="coerce")
 
-# sort 
-ig_spread = ig_spread.sort_values("date").reset_index(drop=True)
+# drop NA and sort
+ig_spread = (
+    ig_spread
+    .dropna(subset=["BAMLC0A0CM"])
+    .sort_values("date")
+    .reset_index(drop=True)
+)
 
 # compute daily change: spread_t - spread_t-1
-ig_spread["ig_spread_daily_chg"] = (ig_spread["BAMLC0A0CM"] - ig_spread["BAMLC0A0CM"].shift(1))
+ig_spread["ig_spread_daily_chg"] = ig_spread["BAMLC0A0CM"].diff()
 
 # keep only final
 ig_spread = ig_spread[["date", "ig_spread_daily_chg"]].copy()
@@ -753,6 +710,103 @@ trading_volume = trading_volume[["date", "tradingVol_btc+eth_daily_log_chg"]].co
 data["trading_volume"] = trading_volume
 
 
+#%% BTC + ETH Log Returns - Independent
+# create average daily log return of BTC and ETH
+
+btc_return = data_raw["btc"].copy()
+eth_return = data_raw["eth"].copy()
+
+# keep only date and price
+btc_return = btc_return[["snapped_at", "price"]].copy()
+eth_return = eth_return[["snapped_at", "price"]].copy()
+
+# convert date column
+btc_return["date"] = pd.to_datetime(
+    btc_return["snapped_at"],
+    utc=True
+).dt.date
+
+eth_return["date"] = pd.to_datetime(
+    eth_return["snapped_at"],
+    utc=True
+).dt.date
+
+# convert price to numeric
+btc_return["btc_price"] = pd.to_numeric(
+    btc_return["price"],
+    errors="coerce"
+)
+
+eth_return["eth_price"] = pd.to_numeric(
+    eth_return["price"],
+    errors="coerce"
+)
+
+# keep final price levels
+btc_return = btc_return[["date", "btc_price"]].copy()
+eth_return = eth_return[["date", "eth_price"]].copy()
+
+# merge BTC and ETH prices
+crypto_returns = pd.merge(
+    btc_return,
+    eth_return,
+    on="date",
+    how="outer"
+)
+
+# sort
+crypto_returns = crypto_returns.sort_values("date").reset_index(drop=True)
+
+# compute individual daily log returns
+crypto_returns["btc_daily_log_ret"] = np.log(
+    crypto_returns["btc_price"] / crypto_returns["btc_price"].shift(1)
+)
+
+crypto_returns["eth_daily_log_ret"] = np.log(
+    crypto_returns["eth_price"] / crypto_returns["eth_price"].shift(1)
+)
+
+# average BTC and ETH daily log returns
+crypto_returns["btc_eth_daily_log_ret_avg"] = crypto_returns[
+    ["btc_daily_log_ret", "eth_daily_log_ret"]
+].mean(axis=1)
+
+# only final format
+crypto_returns = crypto_returns[
+    ["date", "btc_eth_daily_log_ret_avg"]
+].copy()
+
+# store clean
+data["crypto_returns"] = crypto_returns
+
+
+#%% BTC + ETH Realized Volatility - Confounder
+# create 7-day rolling realized volatility from average BTC + ETH daily log returns
+
+crypto_realized_vol = data["crypto_returns"].copy()
+
+# make sure sorted by date
+crypto_realized_vol = crypto_realized_vol.sort_values("date").reset_index(drop=True)
+
+# compute 7-day realized volatility
+# not annualized; this is a rolling daily volatility control
+crypto_realized_vol["btc_eth_realized_vol_7d"] = (
+    crypto_realized_vol["btc_eth_daily_log_ret_avg"]
+    .rolling(window=7, min_periods=7)
+    .std()
+)
+
+# only final format
+crypto_realized_vol = crypto_realized_vol[
+    ["date", "btc_eth_realized_vol_7d"]
+].copy()
+
+# store clean
+data["crypto_realized_vol"] = crypto_realized_vol
+
+
+
+
 #%% Term Spread - Confounder
 # create daily changes
 
@@ -770,13 +824,17 @@ term_spread["T10Y2Y"] = pd.to_numeric(
     errors="coerce"
 )
 
-# sort by date
-term_spread = term_spread.sort_values("date").reset_index(drop=True)
+# drop NA and sort by date
+term_spread = (
+    term_spread
+    .dropna(subset=["T10Y2Y"])
+    .sort_values("date")
+    .reset_index(drop=True)
+)
 
 # compute daily change: spread_t - spread_t-1
 term_spread["term_spread_daily_chg"] = (
-    term_spread["T10Y2Y"] -
-    term_spread["T10Y2Y"].shift(1)
+    term_spread["T10Y2Y"].diff()
 )
 
 # only final format
@@ -803,13 +861,16 @@ usd_index["DTWEXBGS"] = pd.to_numeric(
     errors="coerce"
 )
 
-# sort 
-usd_index = usd_index.sort_values("date").reset_index(drop=True)
+# sort and drop NA
+usd_index = (
+    usd_index
+    .dropna(subset=["DTWEXBGS"])
+    .sort_values("date")
+    .reset_index(drop=True)
+)
 
 # Compute daily log change: ln(index_t / index_t-1)
-usd_index["usd_strength_daily_log_chg"] = np.log(
-    usd_index["DTWEXBGS"] / usd_index["DTWEXBGS"].shift(1)
-)
+usd_index["usd_strength_daily_log_chg"] = np.log(usd_index["DTWEXBGS"]).diff()
 
 # only final format
 usd_index = usd_index[["date", "usd_strength_daily_log_chg"]].copy()
@@ -883,6 +944,72 @@ nfci = nfci[["date", "nfci_weekly_fill"]].copy()
 data["nfci"] = nfci
 
 
+#%% VIX - Dependent / Robust
+# use daily log change at close
+
+vix = data_raw["vix"].copy()
+
+# only date and data
+vix = vix[["DATE", "CLOSE"]].copy()
+
+# convert date col
+vix["date"] = pd.to_datetime(vix["DATE"], format="%m/%d/%Y").dt.date
+
+# convert close to numeric
+vix["CLOSE"] = pd.to_numeric(vix["CLOSE"], errors="coerce")
+
+# sort and drop NA
+vix = (
+    vix
+    .dropna(subset=["CLOSE"])
+    .sort_values("date")
+    .reset_index(drop=True)
+)
+
+# Compute daily log change: ln(vix_t / vix_t-1)
+vix["vix_daily_log_chg"] = np.log(vix["CLOSE"]).diff()
+
+# only final format
+vix = vix[["date", "vix_daily_log_chg"]].copy()
+
+# store clean 
+data["vix"] = vix
+
+
+#%% S&P 500 - Dependent / Robust
+# use daily log change
+
+sp500 = data_raw["sp500"].copy()
+
+# only date and data
+sp500 = sp500[["observation_date", "SP500"]].copy()
+
+# convert date col
+sp500["date"] = pd.to_datetime(sp500["observation_date"]).dt.date
+
+# convert snp500 value to numeric
+sp500["SP500"] = pd.to_numeric(sp500["SP500"], errors="coerce")
+
+# sort and drop NA
+sp500 = (
+    sp500
+    .dropna(subset=["SP500"])
+    .sort_values("date")
+    .reset_index(drop=True)
+)
+
+# Compute daily log return: ln(sp500_t / spr_t-1)
+sp500["sp500_daily_log_ret"] = np.log(sp500["SP500"]).diff()
+
+# only final format
+sp500 = sp500[["date", "sp500_daily_log_ret"]].copy()
+
+# store clean 
+data["sp500"] = sp500
+
+
+
+
 #%%------- MERGE CLEAN DATA FRAMES
 # create merged dataset
 data_table = None
@@ -914,9 +1041,12 @@ data_table = data_table.sort_values("date").reset_index(drop=True)
 
 # filter sample period
 data_table = data_table[
-    (data_table["date"] >= pd.to_datetime("2015-01-01").date()) &
+    (data_table["date"] >= pd.to_datetime("2020-01-01").date()) &
     (data_table["date"] <= pd.to_datetime("2025-12-31").date())
 ].reset_index(drop=True)
+
+# replace infinite values from log changes with missing values - dont think there are any but CHATGPT is insisting and why not...
+data_table = data_table.replace([np.inf, -np.inf], np.nan)
 
 # check 
 print(data_table.head())
@@ -933,6 +1063,7 @@ data_table.to_csv(
 
 #%%------- DATA AVAILABILITY GRAPH
 
+"""
 # use Palatino Linotype
 plt.rcParams["font.family"] = "Palatino Linotype"
 
@@ -957,6 +1088,11 @@ total_days = len(availability_df)
 print(f"Total days in sample: {total_days}")
 
 # classify variables
+dependent_vars = [
+    "hy_spread_daily_chg",
+    "ig_spread_daily_chg",
+]
+
 crypto_vars = [
     "stablecoin_supply_daily_log_chg",
     "stablecoin_exchange_netflow_scaled",
@@ -964,6 +1100,8 @@ crypto_vars = [
     "btc_eth_open_interest_daily_log_chg",
     "btc_eth_funding_rate_avg",
     "tradingVol_btc+eth_daily_log_chg",
+    "btc_eth_daily_log_ret_avg",
+    "btc_eth_realized_vol_7d",
     "usdt_mcap_daily_log_chg",
     "usdc_mcap_daily_log_chg",
     "dai_mcap_daily_log_chg",
@@ -973,15 +1111,13 @@ crypto_vars = [
 tradfi_vars = [
     "vix_daily_log_chg",
     "sp500_daily_log_ret",
-    "hy_spread_daily_chg",
-    "ig_spread_daily_chg",
     "term_spread_daily_chg",
     "usd_strength_daily_log_chg",
     "nfci_weekly_fill",
 ]
 
 # combine in desired order
-plot_vars = tradfi_vars + crypto_vars
+plot_vars = dependent_vars + tradfi_vars + crypto_vars
 
 # nicer names for plot
 var_labels = {
@@ -998,6 +1134,8 @@ var_labels = {
     "btc_eth_open_interest_daily_log_chg": "Open Interest",
     "btc_eth_funding_rate_avg": "Funding Rates",
     "tradingVol_btc+eth_daily_log_chg": "BTC + ETH Volume",
+    "btc_eth_daily_log_ret_avg": "BTC + ETH Return",
+    "btc_eth_realized_vol_7d": "BTC + ETH Volatility",
     "usdt_mcap_daily_log_chg": "USDT Market Cap",
     "usdc_mcap_daily_log_chg": "USDC Market Cap",
     "dai_mcap_daily_log_chg": "DAI Market Cap",
@@ -1019,6 +1157,8 @@ var_subtexts = {
     "btc_eth_open_interest_daily_log_chg": "daily log change in BTC + ETH open interest",
     "btc_eth_funding_rate_avg": "daily average of BTC + ETH funding rates",
     "tradingVol_btc+eth_daily_log_chg": "daily log change in BTC + ETH volume",
+    "btc_eth_daily_log_ret_avg": "equal-weighted average daily log return",
+    "btc_eth_realized_vol_7d": "7-day rolling standard deviation of BTC + ETH average log return",
     "usdt_mcap_daily_log_chg": "daily log change in market cap",
     "usdc_mcap_daily_log_chg": "daily log change in market cap",
     "dai_mcap_daily_log_chg": "daily log change in market cap",
@@ -1033,6 +1173,13 @@ for var in plot_vars:
     missing_days = total_days - available_days
     availability_pct = available_days / total_days * 100
     
+    if var in dependent_vars:
+        var_type = "Dependents"
+    elif var in crypto_vars:
+        var_type = "Crypto"
+    else:
+        var_type = "Traditional finance"
+
     availability.append({
         "variable": var,
         "label": var_labels.get(var, var),
@@ -1040,21 +1187,30 @@ for var in plot_vars:
         "available_days": available_days,
         "missing_days": missing_days,
         "availability_pct": availability_pct,
-        "type": "Crypto" if var in crypto_vars else "Traditional finance"
+        "type": var_type
     })
 
 availability = pd.DataFrame(availability)
 
 # colors
-crypto_color = "#2D373C"
+dependent_color = "#2D373C"
+crypto_color = "#D2EBE9"
 tradfi_color = "#A5D7D2"
 missing_color = "#e0e0e0"
 subtext_color = "#7a7a7a"
 
-availability["color"] = np.where(
-    availability["type"] == "Crypto",
-    crypto_color,
-    tradfi_color
+availability["color"] = np.select(
+    [
+        availability["type"] == "Dependents",
+        availability["type"] == "Crypto",
+        availability["type"] == "Traditional finance",
+    ],
+    [
+        dependent_color,
+        crypto_color,
+        tradfi_color,
+    ],
+    default=missing_color
 )
 
 # reverse order so first variable appears at top
@@ -1092,6 +1248,9 @@ ax.set_yticks([])
 label_transform = blended_transform_factory(ax.transAxes, ax.transData)
 
 for i, row in availability_plot.iterrows():
+    
+    label_weight = "bold" if row["type"] == "Dependents" else "normal"
+    
     ax.text(
         -0.025,
         i + 0.14,
@@ -1100,6 +1259,7 @@ for i, row in availability_plot.iterrows():
         ha="right",
         va="center",
         fontsize=9.8,
+        fontweight=label_weight,
         color="#1f1f1f"
     )
     
@@ -1141,12 +1301,13 @@ ax.spines["bottom"].set_visible(False)
 ax.spines["left"].set_visible(False)
 
 # legend
+dependent_patch = mpatches.Patch(color=dependent_color, label="Dependents")
 tradfi_patch = mpatches.Patch(color=tradfi_color, label="Traditional finance")
 crypto_patch = mpatches.Patch(color=crypto_color, label="Crypto")
 missing_patch = mpatches.Patch(color=missing_color, label="Missing")
 
 legend = fig.legend(
-    handles=[tradfi_patch, crypto_patch, missing_patch],
+    handles=[dependent_patch, tradfi_patch, crypto_patch, missing_patch],
     loc="upper left",
     bbox_to_anchor=(0.055, 0.91),
     frameon=False,
@@ -1157,9 +1318,6 @@ legend = fig.legend(
     borderpad=0.3,
     labelspacing=0.4
 )
-
-for text in legend.get_texts():
-    text.set_color("#1f1f1f")
 
 # add enough left margin for custom labels
 fig.subplots_adjust(left=0.35, right=0.97, top=0.93, bottom=0.08)
@@ -1178,6 +1336,9 @@ plt.show()
 
 
 #%%------- DATA AVAILABILITY TIMELINE GRAPH
+
+# only used in presentation, not in paper
+
 
 # use Palatino Linotype
 plt.rcParams["font.family"] = "Palatino Linotype"
@@ -1418,3 +1579,5 @@ fig.savefig(
 
 
 plt.show()
+
+"""
